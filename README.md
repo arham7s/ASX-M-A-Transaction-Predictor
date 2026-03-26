@@ -4,7 +4,7 @@
 
 A four-phase empirical pipeline that trains a Platt-calibrated XGBoost classifier on ten years of ASX financial data, management sentiment, M&A network topology, and macro regime features — then serves predictions through an interactive GitHub Pages dashboard.
 
-**Live dashboard →** [your-username.github.io/asx-ma-predictor](https://arham7s.github.io/ASX-M-A-Transaction-Predictor/#predictions)
+**Live dashboard →** [arham7s.github.io/asx-ma-predictor](https://arham7s.github.io/ASX-M-A-Transaction-Predictor/#predictions)
 
 ---
 
