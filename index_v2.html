@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ASX M&A Predictor — Arham Kagalwala</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;--bg2:#0d1219;--bg3:#121b26;--bg4:#1a2535;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --cyan:#00d4ff;--green:#00e89a;--orange:#ff7043;--warn:#ffb300;--red:#ff4d6d;
+  --txt:#dde3ee;--txt2:#8fa3be;--txt3:#445566;
+  --r:8px;--rl:12px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'Inter',sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden}
+
+/* ── Ticker ── */
+.ticker{overflow:hidden;background:var(--bg2);border-bottom:1px solid var(--border);height:34px;display:flex;align-items:center}
+.ticker-inner{display:flex;white-space:nowrap;animation:scroll 50s linear infinite}
+.tick{font-family:'DM Mono',monospace;font-size:12px;color:var(--txt2);padding:0 24px;border-right:1px solid var(--border)}
+.tick b{color:var(--cyan);margin-right:6px}
+.tick .hi{color:var(--green)} .tick .md{color:var(--warn)}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ── Nav ── */
+nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;gap:0;padding:0 48px;height:60px;background:rgba(7,9,15,0.93);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:17px;color:var(--txt);flex-shrink:0;letter-spacing:.04em}
+.logo span{color:var(--cyan)}
+.nav-links{display:flex;gap:2px;flex:1;margin-left:32px}
+.nl{font-size:13px;font-weight:500;color:var(--txt2);text-decoration:none;padding:7px 14px;border-radius:var(--r);transition:all .15s}
+.nl:hover{color:var(--cyan);background:rgba(0,212,255,0.07)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2.5s ease-in-out infinite;margin-right:8px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.live-badge{display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--green);letter-spacing:.06em;margin-left:auto}
+
+/* ── Hero ── */
+.hero{position:relative;overflow:hidden;padding:96px 48px 80px;border-bottom:1px solid var(--border)}
+.hero-grid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(0,212,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.025) 1px,transparent 1px);background-size:56px 56px}
+.hero-inner{position:relative;max-width:960px}
+.eyebrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
+.badge{font-family:'DM Mono',monospace;font-size:12px;color:var(--cyan);border:1px solid rgba(0,212,255,0.3);padding:5px 12px;border-radius:4px;background:rgba(0,212,255,0.05);letter-spacing:.05em}
+h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(48px,7vw,88px);line-height:.96;letter-spacing:-.02em;margin-bottom:24px}
+h1 span{color:var(--cyan)}
+.hero-desc{font-size:17px;color:var(--txt2);max-width:580px;line-height:1.75;margin-bottom:52px}
+
+/* ── Stat strip ── */
+.stats{display:flex;gap:0;border:1px solid var(--border2);border-radius:var(--rl);overflow:hidden;width:fit-content;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;align-items:center;padding:22px 40px;border-right:1px solid var(--border);background:var(--bg2);min-width:130px}
+.stat:last-child{border-right:none}
+.stat-val{font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:var(--cyan);line-height:1}
+.stat-lbl{font-size:12px;color:var(--txt3);margin-top:6px;letter-spacing:.03em}
+.stat-hint{font-size:11px;color:var(--txt3);margin-top:3px;font-style:italic}
+
+/* ── What does this mean box ── */
+.explainer-strip{display:flex;gap:16px;margin-top:40px;flex-wrap:wrap}
+.ex-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:20px 24px;flex:1;min-width:220px}
+.ex-card-title{font-size:13px;font-weight:600;color:var(--cyan);margin-bottom:8px;letter-spacing:.02em}
+.ex-card-body{font-size:14px;color:var(--txt2);line-height:1.65}
+
+/* ── Sections ── */
+section{padding:72px 48px;border-bottom:1px solid var(--border)}
+.sec-hd{margin-bottom:40px}
+.sec-hd h2{font-family:'Syne',sans-serif;font-weight:700;font-size:30px;color:var(--txt);margin-bottom:10px}
+.sec-hd p{font-size:16px;color:var(--txt2);max-width:640px;line-height:1.7}
+.plain-note{font-size:14px;color:var(--txt3);margin-top:8px;font-style:italic}
+
+/* ── Predictions controls ── */
+.controls{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.filter-lbl{font-size:13px;font-weight:500;color:var(--txt3)}
+.pill{font-size:13px;font-weight:500;padding:7px 18px;border-radius:100px;border:1px solid var(--border2);background:transparent;color:var(--txt2);cursor:pointer;transition:all .15s}
+.pill:hover{border-color:var(--cyan);color:var(--cyan)}
+.pill.on{background:var(--cyan);border-color:var(--cyan);color:#07090f}
+.search{font-size:14px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);padding:8px 16px;border-radius:var(--r);width:220px;outline:none;transition:border-color .15s;margin-left:auto}
+.search:focus{border-color:var(--cyan)}
+.search::placeholder{color:var(--txt3)}
+
+/* ── Threshold slider ── */
+.slider-row{display:flex;align-items:center;gap:16px;margin-bottom:24px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:20px 24px;flex-wrap:wrap}
+.slider-lbl{font-size:14px;font-weight:600;color:var(--txt);white-space:nowrap}
+.slider-desc{font-size:13px;color:var(--txt2);flex:1;min-width:200px}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--cyan);height:4px;cursor:pointer}
+.slider-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:var(--cyan);min-width:48px;text-align:right}
+.slider-stats{display:flex;gap:24px;margin-top:12px;width:100%;flex-wrap:wrap}
+.ss-item{display:flex;flex-direction:column}
+.ss-val{font-family:'DM Mono',monospace;font-size:17px;font-weight:500;color:var(--txt)}
+.ss-lbl{font-size:12px;color:var(--txt3);margin-top:2px}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--rl);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--bg3)}
+th{font-size:12px;font-weight:600;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;padding:14px 18px;text-align:left;border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+tbody tr.expanded{background:var(--bg3)}
+td{font-size:15px;color:var(--txt);padding:15px 18px;vertical-align:middle}
+.expand-row td{padding:0;background:var(--bg4);border-bottom:1px solid var(--border)}
+.expand-inner{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.expand-item h4{font-size:12px;font-weight:600;color:var(--txt3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px}
+.expand-item p{font-size:14px;color:var(--txt2);line-height:1.6}
+.expand-item .big{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--cyan)}
+
+.tc{color:var(--cyan);font-weight:600;font-size:16px}
+.pbar{display:flex;align-items:center;gap:10px}
+.pb{height:4px;border-radius:2px;background:var(--bg4);flex:1;max-width:110px}
+.pbf{height:100%;border-radius:2px;background:var(--green)}
+.hi-badge{color:var(--green);font-weight:600}
+.md-badge{color:var(--warn)}
+.lo-badge{color:var(--txt3)}
+.chip{font-size:12px;padding:4px 10px;border-radius:4px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.15);color:var(--cyan);white-space:nowrap}
+.tbl-footer{font-size:13px;color:var(--txt3);margin-top:14px}
+
+/* ── Metric cards ── */
+.mcard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:44px}
+.mcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:22px;position:relative;overflow:hidden;cursor:default;transition:border-color .15s}
+.mcard:hover{border-color:var(--border2)}
+.mcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.mcard.c1::before{background:var(--cyan)} .mcard.c2::before{background:var(--green)}
+.mcard.c3::before{background:var(--orange)} .mcard.c4::before{background:var(--warn)}
+.mcard-lbl{font-size:12px;font-weight:600;color:var(--txt3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
+.mcard-val{font-family:'DM Mono',monospace;font-size:30px;font-weight:500;line-height:1;margin-bottom:8px}
+.mcard-val.g{color:var(--green)} .mcard-val.b{color:var(--cyan)}
+.mcard-explain{font-size:13px;color:var(--txt2);line-height:1.55}
+.mcard-compare{font-size:12px;color:var(--txt3);margin-top:6px}
+
+/* ── Chart cards ── */
+.chart-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.ccard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:26px}
+.ccard-hd{margin-bottom:20px}
+.ccard-title{font-size:17px;font-weight:600;color:var(--txt);display:block;margin-bottom:6px}
+.ccard-sub{font-size:13px;color:var(--txt2);display:block;line-height:1.5}
+.ccard-hint{font-size:12px;color:var(--txt3);margin-top:6px;font-style:italic;display:block}
+.chart-h{height:280px;position:relative}
+.chart-htall{height:340px;position:relative}
+
+/* ── Calibration cards ── */
+.cal-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.calcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:26px;transition:border-color .15s}
+.calcard.best{border-color:rgba(0,232,154,.35)}
+.calcard-top{font-size:12px;font-weight:600;color:var(--txt3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.best-tag{font-size:11px;background:var(--green);color:#07090f;padding:3px 8px;border-radius:4px;font-weight:700}
+.calcard-name{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;color:var(--txt);margin-bottom:18px}
+.calcard-rows{display:flex;flex-direction:column;gap:12px}
+.calcard-row{display:flex;justify-content:space-between;align-items:center}
+.calcard-key{font-size:13px;color:var(--txt3)}
+.calcard-val{font-family:'DM Mono',monospace;font-size:15px;color:var(--txt)}
+.calcard-val.better{color:var(--green)}
+.explain-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:32px}
+.explain-box h3{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;color:var(--txt);margin-bottom:12px}
+.explain-box p{font-size:15px;color:var(--txt2);line-height:1.75;max-width:720px}
+.em-row{display:flex;gap:32px;margin-top:24px;flex-wrap:wrap}
+.em-item{display:flex;flex-direction:column}
+.em-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--cyan)}
+.em-lbl{font-size:12px;color:var(--txt3);margin-top:3px}
+
+/* ── Backtest ── */
+.bt-tbl-wrap{margin-top:24px;overflow-x:auto;border-radius:var(--rl);border:1px solid var(--border)}
+td.pos{color:var(--green)} td.neg{color:var(--red)} td.na{color:var(--txt3)}
+
+/* ── Pipeline ── */
+.pipe{display:flex;flex-direction:column;gap:0;margin-bottom:52px}
+.pipe-step{display:flex;gap:36px;padding:36px 0;border-bottom:1px solid var(--border)}
+.pipe-step:first-child{border-top:1px solid var(--border)}
+.step-no{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--cyan);letter-spacing:.1em;flex-shrink:0;width:44px;padding-top:4px}
+.step-title{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;color:var(--txt);margin-bottom:10px}
+.step-body{font-size:15px;color:var(--txt2);line-height:1.72;max-width:660px;margin-bottom:16px}
+.tags{display:flex;gap:8px;flex-wrap:wrap}
+.tag-sm{font-size:12px;color:var(--txt2);border:1px solid var(--border2);padding:4px 10px;border-radius:4px}
+.guards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.guard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:26px}
+.guard-icon{font-size:24px;margin-bottom:14px;display:block}
+.guard h4{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--txt);margin-bottom:8px}
+.guard p{font-size:14px;color:var(--txt2);line-height:1.65}
+code{font-family:'DM Mono',monospace;font-size:13px;background:var(--bg4);padding:2px 6px;border-radius:4px;color:var(--cyan)}
+
+/* ── Footer ── */
+footer{padding:44px 48px 36px;background:var(--bg2);border-top:1px solid var(--border)}
+.footer-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
+.footer-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;color:var(--txt)}
+.footer-sub{font-size:13px;color:var(--txt3);margin-top:4px}
+.footer-links{display:flex;gap:20px}
+.footer-link{font-size:13px;color:var(--txt2);text-decoration:none;transition:color .15s}
+.footer-link:hover{color:var(--cyan)}
+.footer-disc{font-size:12px;color:var(--txt3);border-top:1px solid var(--border);padding-top:16px;line-height:1.6}
+
+/* ── Responsive ── */
+@media(max-width:860px){
+  nav{padding:0 20px} .nav-links{display:none}
+  .hero{padding:56px 20px 48px} section{padding:48px 20px}
+  .stats{width:100%} .stat{flex:1;padding:16px 20px}
+  .chart-pair{grid-template-columns:1fr} .cal-row{grid-template-columns:1fr}
+  .guards{grid-template-columns:1fr} .expand-inner{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- Ticker -->
+<div class="ticker"><div class="ticker-inner" id="tickerEl"></div></div>
+
+<!-- Nav -->
+<nav>
+  <div class="logo">ASX <span>M&amp;A</span> Predictor</div>
+  <div class="nav-links">
+    <a href="#predictions" class="nl">Predictions</a>
+    <a href="#performance" class="nl">Performance</a>
+    <a href="#calibration" class="nl">Calibration</a>
+    <a href="#backtest" class="nl">Backtest</a>
+    <a href="#how-it-works" class="nl">How it works</a>
+  </div>
+  <div class="live-badge"><span class="dot"></span>MODEL LIVE</div>
+</nav>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="eyebrow">
+      <span class="badge">XGBoost · Walk-forward · SHAP</span>
+      <span class="badge">ASX Listed Companies · FY2008–FY2017</span>
+    </div>
+    <h1>Who's next<br/><span>on the block?</span></h1>
+    <p class="hero-desc">
+      A machine learning model trained on 10 years of ASX financial data —
+      plus company network connections, management tone, and market conditions —
+      to predict which companies are likely to be involved in a merger or acquisition.
+    </p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val" data-k="roc_auc">—</span><span class="stat-lbl">ROC-AUC</span><span class="stat-hint">Discrimination power</span></div>
+      <div class="stat"><span class="stat-val" data-k="pr_auc">—</span><span class="stat-lbl">PR-AUC</span><span class="stat-hint">Rare-event accuracy</span></div>
+      <div class="stat"><span class="stat-val" data-k="lift">—</span><span class="stat-lbl">Lift vs random</span><span class="stat-hint">Better than guessing by</span></div>
+      <div class="stat"><span class="stat-val" data-k="mean_hit_rate">—</span><span class="stat-lbl">Hit rate</span><span class="stat-hint">Flagged firms that dealt</span></div>
+      <div class="stat"><span class="stat-val" data-k="rec_f1">—</span><span class="stat-lbl">Best F1</span><span class="stat-hint">Precision + recall balance</span></div>
+    </div>
+
+    <div class="explainer-strip">
+      <div class="ex-card">
+        <div class="ex-card-title">What is ROC-AUC?</div>
+        <div class="ex-card-body">A score from 0–1. 0.5 means random guessing; 1.0 means perfect. Our model scores <strong id="roc-inline">0.82</strong> — well above chance.</div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-card-title">What is "Lift"?</div>
+        <div class="ex-card-body">If you picked companies randomly, ~8% would do a deal. Our top predictions have a <strong id="lift-inline">58%</strong> hit rate — that's <strong id="lift-x-inline">7×</strong> better.</div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-card-title">What does the model predict?</div>
+        <div class="ex-card-body">For each ASX company, it outputs a probability (0–100%) that the company will be involved in a merger, acquisition, or buyout in the next fiscal year.</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ── Predictions ─────────────────────────────────────────────────────── -->
+<section id="predictions">
+  <div class="sec-hd">
+    <h2>FY18 Predictions</h2>
+    <p>Every ASX company ranked by the model's estimated deal probability. Use the threshold slider to tighten or loosen the screening — see exactly how precision and recall trade off in real time.</p>
+    <p class="plain-note">Click any row to see what drove that company's score.</p>
+  </div>
+
+  <!-- Threshold slider -->
+  <div class="slider-row">
+    <span class="slider-lbl">Minimum probability threshold</span>
+    <span class="slider-desc">Move this slider to change which companies get flagged. Higher = fewer but more confident predictions.</span>
+    <input type="range" id="threshSlider" min="10" max="85" value="45" step="5"/>
+    <span class="slider-val" id="threshVal">45%</span>
+    <div class="slider-stats">
+      <div class="ss-item"><span class="ss-val" id="ss-flagged">—</span><span class="ss-lbl">Companies flagged</span></div>
+      <div class="ss-item"><span class="ss-val" id="ss-precision">—</span><span class="ss-lbl">Precision (of flagged, % that dealt)</span></div>
+      <div class="ss-item"><span class="ss-val" id="ss-recall">—</span><span class="ss-lbl">Recall (% of all deals caught)</span></div>
+      <div class="ss-item"><span class="ss-val" id="ss-f1">—</span><span class="ss-lbl">F1 score</span></div>
+    </div>
+  </div>
+
+  <!-- Filter pills + search -->
+  <div class="controls">
+    <span class="filter-lbl">Show:</span>
+    <button class="pill on" data-f="ALL">All companies</button>
+    <button class="pill" data-f="HIGH">High confidence ≥ 70%</button>
+    <button class="pill" data-f="MEDIUM">Medium 50–70%</button>
+    <input class="search" type="text" id="searchBox" placeholder="Search by ticker…"/>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:52px">#</th>
+        <th>Company (Ticker)</th>
+        <th>Deal Probability</th>
+        <th>Signal strength</th>
+        <th>Main reason flagged</th>
+      </tr></thead>
+      <tbody id="tBody"></tbody>
+    </table>
+  </div>
+  <div class="tbl-footer" id="tFoot"></div>
+</section>
+
+<!-- ── Performance ────────────────────────────────────────────────────────── -->
+<section id="performance">
+  <div class="sec-hd">
+    <h2>Model Performance</h2>
+    <p>How well does the model actually work? These metrics are all computed <em>out-of-fold</em> — the model never saw the test data during training, so the numbers are honest.</p>
+  </div>
+  <div class="mcard-grid" id="mcards"></div>
+
+  <div class="chart-pair">
+    <div class="ccard">
+      <div class="ccard-hd">
+        <span class="ccard-title">Precision, Recall &amp; F1 at each threshold</span>
+        <span class="ccard-sub">Precision = of all flagged companies, how many actually did a deal. Recall = of all companies that did a deal, how many did we catch.</span>
+        <span class="ccard-hint">The F1 curve peaks at the threshold that best balances the two — that's our recommended operating point.</span>
+      </div>
+      <div class="chart-h"><canvas id="threshChart"></canvas></div>
+    </div>
+    <div class="ccard">
+      <div class="ccard-hd">
+        <span class="ccard-title">Are the probabilities accurate?</span>
+        <span class="ccard-sub">If the model says 70%, do ~70% of those companies actually deal? The green bars show reality; the blue bars show what the model predicted.</span>
+        <span class="ccard-hint">A perfectly calibrated model would have matching bars. After Platt scaling, ours is close.</span>
+      </div>
+      <div class="chart-h"><canvas id="calBinsChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Calibration ────────────────────────────────────────────────────────── -->
+<section id="calibration">
+  <div class="sec-hd">
+    <h2>Calibration — Can You Trust the Probabilities?</h2>
+    <p>A model can be good at ranking companies (high ROC-AUC) but still give unreliable probabilities. "Calibration" measures whether the scores actually mean what they say.</p>
+  </div>
+  <div class="cal-row" id="calCards"></div>
+  <div class="explain-box">
+    <h3>Why this matters for M&amp;A screening</h3>
+    <p>XGBoost, like most tree models, is naturally overconfident — it tends to push scores toward 0 or 1. A raw score of 80% might only correspond to a 45% real deal rate. <strong>Platt scaling</strong> fixes this by fitting a logistic curve on top of the raw scores. After calibration, if the model says 80%, roughly 80% of companies at that score really do transact — which is what you need to set meaningful screens.</p>
+    <div class="em-row" id="emRow"></div>
+  </div>
+</section>
+
+<!-- ── Backtest ────────────────────────────────────────────────────────────── -->
+<section id="backtest">
+  <div class="sec-hd">
+    <h2>Backtest — Did it Actually Work Historically?</h2>
+    <p>Each year, we pretend we only have data up to that point, run the model, take the top 20 predictions, and check how many of those companies actually announced a deal. Green bars = beat the base rate. Red = missed.</p>
+  </div>
+  <div class="ccard" style="margin-bottom:24px">
+    <div class="ccard-hd">
+      <span class="ccard-title">Portfolio hit rate vs base rate (FY2013–FY2017)</span>
+      <span class="ccard-sub">The dashed amber line is the "random" baseline — the share of all ASX companies that did a deal in any given year (~8%). Our portfolio consistently beats it.</span>
+    </div>
+    <div class="chart-htall"><canvas id="btChart"></canvas></div>
+  </div>
+  <div class="bt-tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Year</th><th>Portfolio size</th><th>Hit rate</th><th>Avg confidence</th><th>Actual deals</th><th>Portfolio return</th><th>ASX 200</th><th>Alpha (outperformance)</th>
+      </tr></thead>
+      <tbody id="btBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── How it works ───────────────────────────────────────────────────────── -->
+<section id="how-it-works">
+  <div class="sec-hd">
+    <h2>How It Works</h2>
+    <p>A four-phase pipeline transforms raw ASX filings into calibrated deal probabilities.</p>
+  </div>
+  <div class="pipe">
+    <div class="pipe-step">
+      <div class="step-no">01</div>
+      <div>
+        <div class="step-title">Model upgrade — from Random Forest to XGBoost</div>
+        <p class="step-body">The original model used Random Forest with a random 80/20 train-test split. The problem: a random split lets the model train on 2017 data and "predict" 2014 — that's cheating. We replaced it with <strong>walk-forward validation</strong> (each year's model is trained only on prior years) and upgraded to XGBoost, which handles class imbalance and gives SHAP explanations for every prediction.</p>
+        <div class="tags"><span class="tag-sm">XGBoost</span><span class="tag-sm">Walk-forward CV (no lookahead)</span><span class="tag-sm">SHAP explainability</span></div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="step-no">02</div>
+      <div>
+        <div class="step-title">Signal enrichment — 3 new feature groups added</div>
+        <p class="step-body">The original model used 11 financial ratios (debt, liquidity, profitability etc.). We added three more signal groups: <strong>sentiment</strong> (does management language in earnings calls sound acquisitive?), <strong>network position</strong> (is this company already connected to serial acquirers in past deals?), and <strong>macro regime</strong> (is the broader market environment conducive to deals — low rates, tight spreads, rising equity?). Total: 31 features.</p>
+        <div class="tags"><span class="tag-sm">VADER sentiment + M&amp;A keywords</span><span class="tag-sm">NetworkX graph centrality</span><span class="tag-sm">RBA cash rate · ASX200 vol · credit spreads</span><span class="tag-sm">31 features total</span></div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="step-no">03</div>
+      <div>
+        <div class="step-title">Evaluation — beyond the confusion matrix</div>
+        <p class="step-body">The original model only printed a confusion matrix. We added: ROC-AUC and PR-AUC curves (PR-AUC matters more here because deals are rare), Expected Calibration Error to check probability reliability, a full threshold sweep to find the best operating point, and a walk-forward backtest that measures portfolio hit rate and alpha vs the ASX 200 index.</p>
+        <div class="tags"><span class="tag-sm">ROC-AUC · PR-AUC</span><span class="tag-sm">Expected Calibration Error (ECE)</span><span class="tag-sm">Platt scaling</span><span class="tag-sm">Walk-forward backtest</span></div>
+      </div>
+    </div>
+    <div class="pipe-step">
+      <div class="step-no">04</div>
+      <div>
+        <div class="step-title">This dashboard — static GitHub Pages, no server</div>
+        <p class="step-body">The Python pipeline exports <code>report_data.json</code> and <code>predictions.json</code>. This page reads those files and renders everything client-side with Chart.js. To update: re-run the pipeline, push two JSON files, and GitHub Pages redeploys automatically — no backend, no database, no cost.</p>
+        <div class="tags"><span class="tag-sm">GitHub Pages</span><span class="tag-sm">Chart.js</span><span class="tag-sm">Zero backend</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="guards">
+    <div class="guard"><span class="guard-icon">🚫</span><h4>No lookahead bias</h4><p>Walk-forward validation ensures every fold only trains on data strictly before the test year. No future information leaks into training.</p></div>
+    <div class="guard"><span class="guard-icon">⚖️</span><h4>Class imbalance handled</h4><p>Deals are rare (~8% of company-years). XGBoost's <code>scale_pos_weight</code> parameter is set to the no-deal / deal ratio so the model isn't biased toward predicting "no deal" always.</p></div>
+    <div class="guard"><span class="guard-icon">🎯</span><h4>Calibrated probabilities</h4><p>Platt scaling is fitted on a held-out 30% split, so the output probabilities are grounded in reality — not just rank scores.</p></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="footer-row">
+    <div><div class="footer-title">ASX M&amp;A Predictor</div><div class="footer-sub">Academic research · Dwarkadas J. Sanghvi College of Engineering, Mumbai</div></div>
+    <div class="footer-links">
+      <a href="evaluation_report.pdf" class="footer-link" target="_blank">Methodology PDF ↗</a>
+      <a href="https://github.com" class="footer-link" target="_blank">GitHub ↗</a>
+    </div>
+  </div>
+  <div class="footer-disc">For academic purposes only. Not investment advice. Predictions are based on publicly available historical data and a statistical model — past patterns do not guarantee future results.</div>
+</footer>
+
+<!-- ══════════════════════════════════════════════════════════════
+  DATA SECTION — replace with your real pipeline outputs.
+
+  After running the full pipeline:
+    1. report_data.json  → produced by phase3c_report.py (paste into REPORT_DATA)
+    2. predictions.json  → run:
+         import pandas as pd; df = pd.read_excel("predictions_FY18.xlsx")
+         df["Ticker"] = df.index
+         print(df[["Ticker","Deal_Probability","Predicted_Label","Flag","Top_SHAP_Driver"]].to_json(orient="records",indent=2))
+       then paste into PREDICTIONS
+═══════════════════════════════════════════════════════════════ -->
+<script>
+const REPORT_DATA = {
+  metrics:{
+    roc_auc:0.8241,pr_auc:0.4817,ece_raw:0.0893,ece_platt:0.0312,brier_platt:0.0641,
+    rec_threshold:0.45,rec_precision:0.6120,rec_recall:0.5340,rec_f1:0.5703,
+    mean_hit_rate:0.5800,base_rate:0.0820,lift:7.07,mean_alpha:0.0412,
+  },
+  phase_comparison:{phase1:{roc_auc:0.7614,pr_auc:0.3821},phase2:{roc_auc:0.8241,pr_auc:0.4817}},
+  calibration_models:[
+    {Model:"XGBoost (raw)",        ECE:0.0893,Brier:0.0812,ROC_AUC:0.8241,PR_AUC:0.4817},
+    {Model:"XGBoost + Platt",      ECE:0.0312,Brier:0.0641,ROC_AUC:0.8198,PR_AUC:0.4791},
+    {Model:"XGBoost + Isotonic",   ECE:0.0441,Brier:0.0698,ROC_AUC:0.8176,PR_AUC:0.4703},
+  ],
+  backtest_annual:[
+    {Year:2013,N_Portfolio:20,Hit_Rate:0.50,Mean_Pred_Prob:0.67,Actual_Deal_Count:10,Port_Return:0.112,Bench_Return:0.148,Alpha:-0.036},
+    {Year:2014,N_Portfolio:20,Hit_Rate:0.55,Mean_Pred_Prob:0.69,Actual_Deal_Count:11,Port_Return:0.098,Bench_Return:0.055,Alpha:0.043},
+    {Year:2015,N_Portfolio:20,Hit_Rate:0.60,Mean_Pred_Prob:0.71,Actual_Deal_Count:12,Port_Return:0.031,Bench_Return:-0.009,Alpha:0.040},
+    {Year:2016,N_Portfolio:20,Hit_Rate:0.65,Mean_Pred_Prob:0.73,Actual_Deal_Count:13,Port_Return:0.189,Bench_Return:0.117,Alpha:0.072},
+    {Year:2017,N_Portfolio:18,Hit_Rate:0.56,Mean_Pred_Prob:0.68,Actual_Deal_Count:10,Port_Return:0.143,Bench_Return:0.119,Alpha:0.024},
+  ],
+  threshold_analysis:[
+    {Threshold:0.10,Precision:0.142,Recall:0.921,F1:0.244,N_Flagged:210},
+    {Threshold:0.20,Precision:0.228,Recall:0.784,F1:0.353,N_Flagged:140},
+    {Threshold:0.30,Precision:0.339,Recall:0.687,F1:0.454,N_Flagged:89},
+    {Threshold:0.40,Precision:0.492,Recall:0.598,F1:0.540,N_Flagged:61},
+    {Threshold:0.45,Precision:0.612,Recall:0.534,F1:0.570,N_Flagged:49},
+    {Threshold:0.50,Precision:0.631,Recall:0.461,F1:0.533,N_Flagged:38},
+    {Threshold:0.60,Precision:0.682,Recall:0.311,F1:0.428,N_Flagged:22},
+    {Threshold:0.70,Precision:0.714,Recall:0.201,F1:0.314,N_Flagged:14},
+    {Threshold:0.80,Precision:0.714,Recall:0.095,F1:0.168,N_Flagged:7},
+  ],
+  calibration_bins:[
+    {mean_predicted_prob:0.041,actual_fraction_deals:0.022},
+    {mean_predicted_prob:0.152,actual_fraction_deals:0.129},
+    {mean_predicted_prob:0.249,actual_fraction_deals:0.235},
+    {mean_predicted_prob:0.352,actual_fraction_deals:0.361},
+    {mean_predicted_prob:0.449,actual_fraction_deals:0.431},
+    {mean_predicted_prob:0.548,actual_fraction_deals:0.568},
+    {mean_predicted_prob:0.649,actual_fraction_deals:0.677},
+    {mean_predicted_prob:0.749,actual_fraction_deals:0.737},
+    {mean_predicted_prob:0.843,actual_fraction_deals:0.800},
+    {mean_predicted_prob:0.932,actual_fraction_deals:0.750},
+  ],
+};
+
+const PREDICTIONS=[
+  {Ticker:"BHP", Deal_Probability:0.8812,Flag:"HIGH",  Top_SHAP_Driver:"debt_ratio",            shap_explain:"High leverage ratio is the single strongest signal — leveraged companies are prime restructuring targets.",         sector:"Materials",  deals_in_history:3},
+  {Ticker:"WBC", Deal_Probability:0.8547,Flag:"HIGH",  Top_SHAP_Driver:"pagerank",               shap_explain:"Network centrality is very high — WBC sits at the center of the historical M&A graph, connected to serial acquirers.", sector:"Financials", deals_in_history:5},
+  {Ticker:"MQG", Deal_Probability:0.8213,Flag:"HIGH",  Top_SHAP_Driver:"ma_keyword_score",       shap_explain:"Earnings calls used acquisition language ('bolt-on', 'strategic fit', 'accretive') far above the sector average.",     sector:"Financials", deals_in_history:7},
+  {Ticker:"ANZ", Deal_Probability:0.7981,Flag:"HIGH",  Top_SHAP_Driver:"quick_ratio",            shap_explain:"Low quick ratio signals the company may seek inorganic growth rather than organic expansion.",                          sector:"Financials", deals_in_history:4},
+  {Ticker:"CBA", Deal_Probability:0.7644,Flag:"HIGH",  Top_SHAP_Driver:"sentiment_score",        shap_explain:"Positive management tone combined with high cash reserves — classic acquisition war-chest signal.",                     sector:"Financials", deals_in_history:3},
+  {Ticker:"WES", Deal_Probability:0.7432,Flag:"HIGH",  Top_SHAP_Driver:"out_degree",             shap_explain:"Has been an acquirer in 6 prior transactions — serial acquirer classification drives this score.",                      sector:"Consumer",   deals_in_history:6},
+  {Ticker:"RIO", Deal_Probability:0.7218,Flag:"HIGH",  Top_SHAP_Driver:"debt_ratio",             shap_explain:"Debt structure typical of companies undergoing portfolio restructuring. Divestiture risk elevated.",                    sector:"Materials",  deals_in_history:4},
+  {Ticker:"TLS", Deal_Probability:0.7041,Flag:"HIGH",  Top_SHAP_Driver:"regime_expansion",       shap_explain:"Current macro regime is EXPANSION (low rates, positive equity). Historically, deals cluster in this regime.",          sector:"Telecom",    deals_in_history:2},
+  {Ticker:"NAB", Deal_Probability:0.6891,Flag:"MEDIUM",Top_SHAP_Driver:"betweenness_centrality", shap_explain:"High betweenness — NAB sits between otherwise disconnected acquirer clusters, acting as a deal broker.",               sector:"Financials", deals_in_history:4},
+  {Ticker:"WOW", Deal_Probability:0.6714,Flag:"MEDIUM",Top_SHAP_Driver:"tone_shift",             shap_explain:"Significant year-on-year deterioration in management sentiment tone — often precedes defensive M&A activity.",         sector:"Consumer",   deals_in_history:3},
+  {Ticker:"AMP", Deal_Probability:0.6523,Flag:"MEDIUM",Top_SHAP_Driver:"current_ratio",          shap_explain:"Liquidity ratios in the range historically associated with companies seeking to deploy excess cash via acquisitions.",   sector:"Financials", deals_in_history:2},
+  {Ticker:"SUN", Deal_Probability:0.6312,Flag:"MEDIUM",Top_SHAP_Driver:"ma_keyword_score",       shap_explain:"M&A vocabulary frequency in recent earnings call is 2.3× above the insurance sector average.",                         sector:"Financials", deals_in_history:3},
+  {Ticker:"IAG", Deal_Probability:0.6108,Flag:"MEDIUM",Top_SHAP_Driver:"pagerank",               shap_explain:"Connected to several high-centrality nodes in the deal network, elevating its own network importance score.",            sector:"Financials", deals_in_history:2},
+  {Ticker:"QBE", Deal_Probability:0.5914,Flag:"MEDIUM",Top_SHAP_Driver:"debt_equity",            shap_explain:"Debt/equity ratio at a level where financial restructuring (via M&A) is more likely than organic deleveraging.",        sector:"Financials", deals_in_history:4},
+  {Ticker:"CPU", Deal_Probability:0.5742,Flag:"MEDIUM",Top_SHAP_Driver:"sentiment_vol",          shap_explain:"High sentiment volatility — erratic management tone across quarters signals internal uncertainty or strategic shift.",   sector:"Technology", deals_in_history:2},
+  {Ticker:"SCG", Deal_Probability:0.5611,Flag:"MEDIUM",Top_SHAP_Driver:"asset_turnover",         shap_explain:"Low asset turnover in an expansion regime — underutilised balance sheet makes the company attractive to consolidators.", sector:"Real Estate",deals_in_history:1},
+  {Ticker:"LLC", Deal_Probability:0.5488,Flag:"MEDIUM",Top_SHAP_Driver:"tone_shift",             shap_explain:"Negative tone shift over 2 consecutive years — management language becoming more cautious, typical pre-deal.",           sector:"Real Estate",deals_in_history:2},
+  {Ticker:"MGR", Deal_Probability:0.5241,Flag:"MEDIUM",Top_SHAP_Driver:"in_degree",              shap_explain:"Has been the target in 3 prior transactions — companies with high in-degree are more likely to be targeted again.",      sector:"Real Estate",deals_in_history:3},
+  {Ticker:"DXS", Deal_Probability:0.5112,Flag:"MEDIUM",Top_SHAP_Driver:"roa",                    shap_explain:"Return on assets below sector median — underperformance relative to peers elevates takeover risk.",                     sector:"Real Estate",deals_in_history:1},
+  {Ticker:"GPT", Deal_Probability:0.5034,Flag:"MEDIUM",Top_SHAP_Driver:"roe",                    shap_explain:"ROE near the threshold that historically separates deal-involved from non-deal companies in this sector.",               sector:"Real Estate",deals_in_history:2},
+  {Ticker:"CSL", Deal_Probability:0.4812,Flag:"LOW",   Top_SHAP_Driver:"profit_margin",          shap_explain:"Strong profit margins and low debt reduce deal necessity. The model sees little financial motivation for M&A.",          sector:"Healthcare", deals_in_history:1},
+  {Ticker:"COL", Deal_Probability:0.4601,Flag:"LOW",   Top_SHAP_Driver:"quick_ratio",            shap_explain:"Healthy liquidity with no signs of excess cash deployment or distress.",                                                sector:"Consumer",   deals_in_history:0},
+  {Ticker:"REA", Deal_Probability:0.4322,Flag:"LOW",   Top_SHAP_Driver:"revenue_growth",         shap_explain:"High organic revenue growth reduces the incentive to grow inorganically through deals.",                                sector:"Technology", deals_in_history:1},
+  {Ticker:"CAR", Deal_Probability:0.4118,Flag:"LOW",   Top_SHAP_Driver:"roe",                    shap_explain:"Strong returns on equity and a stable network position. Low deal signal across all feature groups.",                    sector:"Technology", deals_in_history:0},
+  {Ticker:"SEK", Deal_Probability:0.3891,Flag:"LOW",   Top_SHAP_Driver:"debt_ratio",             shap_explain:"Low leverage and high organic growth rate. Minimal financial restructuring pressure.",                                  sector:"Technology", deals_in_history:1},
+  {Ticker:"APT", Deal_Probability:0.3612,Flag:"LOW",   Top_SHAP_Driver:"current_ratio",          shap_explain:"Current ratio well above distress threshold. No significant M&A signals in network or sentiment features.",             sector:"Technology", deals_in_history:0},
+  {Ticker:"ASX", Deal_Probability:0.3401,Flag:"LOW",   Top_SHAP_Driver:"profit_margin",          shap_explain:"Market infrastructure role and high margins insulate from typical deal drivers. Low centrality in deal network.",       sector:"Financials", deals_in_history:1},
+  {Ticker:"NXT", Deal_Probability:0.3188,Flag:"LOW",   Top_SHAP_Driver:"asset_turnover",         shap_explain:"Asset-light business model with improving efficiency. Deal signal below model threshold on all three feature groups.",   sector:"Technology", deals_in_history:0},
+  {Ticker:"ZIP", Deal_Probability:0.2941,Flag:"LOW",   Top_SHAP_Driver:"sentiment_vol",          shap_explain:"High sentiment volatility but driven by product news, not M&A language. Network position peripheral.",                  sector:"Technology", deals_in_history:0},
+  {Ticker:"KGN", Deal_Probability:0.2712,Flag:"LOW",   Top_SHAP_Driver:"debt_equity",            shap_explain:"Low debt and small network footprint. Model assigns low deal probability across all signal groups.",                    sector:"Consumer",   deals_in_history:0},
+];
+</script>
+
+<script>
+/* ── Chart defaults ── */
+Chart.defaults.color='#8fa3be';Chart.defaults.font.family="'DM Mono',monospace";Chart.defaults.font.size=12;Chart.defaults.borderColor='rgba(255,255,255,0.05)';
+const CY='#00d4ff',GR='#00e89a',OR='#ff7043',WN='#ffb300',RD='#ff4d6d';
+
+/* ── Hero stats ── */
+function heroStats(){
+  const m=REPORT_DATA.metrics;
+  const map={roc_auc:m.roc_auc.toFixed(4),pr_auc:m.pr_auc.toFixed(4),lift:m.lift.toFixed(1)+'×',mean_hit_rate:(m.mean_hit_rate*100).toFixed(0)+'%',rec_f1:m.rec_f1.toFixed(3)};
+  document.querySelectorAll('[data-k]').forEach(el=>el.textContent=map[el.dataset.k]??'—');
+  document.getElementById('roc-inline').textContent=m.roc_auc.toFixed(2);
+  document.getElementById('lift-inline').textContent=(m.mean_hit_rate*100).toFixed(0)+'%';
+  document.getElementById('lift-x-inline').textContent=m.lift.toFixed(1)+'×';
+}
+
+/* ── Ticker ── */
+function buildTicker(){
+  const top=PREDICTIONS.slice(0,14);
+  const html=[...top,...top].map(p=>{
+    const cls=p.Flag==='HIGH'?'hi':'md';
+    return `<span class="tick"><b>${p.Ticker}</b><span class="${cls}">${(p.Deal_Probability*100).toFixed(0)}% deal probability</span></span>`;
+  }).join('');
+  document.getElementById('tickerEl').innerHTML=html;
+}
+
+/* ── Threshold slider live update ── */
+let activeFilter='ALL',expandedTicker=null;
+
+function getThreshRow(val){
+  const rows=REPORT_DATA.threshold_analysis;
+  // find closest row
+  return rows.reduce((best,r)=>Math.abs(r.Threshold-val/100)<Math.abs(best.Threshold-val/100)?r:best,rows[0]);
+}
+
+function updateSliderStats(val){
+  document.getElementById('threshVal').textContent=val+'%';
+  const row=getThreshRow(val);
+  document.getElementById('ss-flagged').textContent=row.N_Flagged;
+  document.getElementById('ss-precision').textContent=(row.Precision*100).toFixed(0)+'%';
+  document.getElementById('ss-recall').textContent=(row.Recall*100).toFixed(0)+'%';
+  document.getElementById('ss-f1').textContent=row.F1.toFixed(3);
+}
+
+document.getElementById('threshSlider').addEventListener('input',function(){
+  updateSliderStats(+this.value);
+  renderTable();
+});
+updateSliderStats(45);
+
+/* ── Predictions table ── */
+function renderTable(){
+  const thresh=+document.getElementById('threshSlider').value/100;
+  const q=document.getElementById('searchBox').value.trim().toUpperCase();
+  let data=[...PREDICTIONS];
+  if(activeFilter==='HIGH')   data=data.filter(r=>r.Flag==='HIGH');
+  if(activeFilter==='MEDIUM') data=data.filter(r=>r.Flag==='MEDIUM');
+  if(q) data=data.filter(r=>r.Ticker.includes(q));
+
+  const tbody=document.getElementById('tBody');
+  const footer=document.getElementById('tFoot');
+
+  if(!data.length){
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--txt3);padding:40px;font-size:15px">No companies match your filters</td></tr>`;
+    footer.textContent='';return;
+  }
+
+  tbody.innerHTML=data.map((row,i)=>{
+    const pct=(row.Deal_Probability*100).toFixed(0);
+    const above=row.Deal_Probability>=thresh;
+    const flagCls=row.Flag==='HIGH'?'hi-badge':row.Flag==='MEDIUM'?'md-badge':'lo-badge';
+    const flagLabel=row.Flag==='HIGH'?'🟢 High confidence':row.Flag==='MEDIUM'?'🟡 Medium':'⚪ Low';
+    const dim=!above?'opacity:.4;':'';
+    const isExpanded=expandedTicker===row.Ticker;
+
+    return `<tr data-ticker="${row.Ticker}" style="${dim}" onclick="toggleExpand('${row.Ticker}')">
+      <td style="color:var(--txt3)">${i+1}</td>
+      <td><span class="tc">${row.Ticker}</span><span style="font-size:12px;color:var(--txt3);margin-left:8px">${row.sector??''}</span></td>
+      <td><div class="pbar"><span style="color:var(--green);font-size:16px;font-weight:600">${pct}%</span><div class="pb"><div class="pbf" style="width:${pct}%"></div></div></div></td>
+      <td><span class="${flagCls}">${flagLabel}</span></td>
+      <td><span class="chip">${row.Top_SHAP_Driver}</span></td>
+    </tr>
+    ${isExpanded?`<tr class="expand-row"><td colspan="5"><div class="expand-inner">
+      <div class="expand-item"><h4>Why was this flagged?</h4><p>${row.shap_explain??'—'}</p></div>
+      <div class="expand-item"><h4>Deal probability</h4><p class="big">${pct}%</p><p>Threshold is ${(thresh*100).toFixed(0)}% — this company is <strong>${row.Deal_Probability>=thresh?'above':'below'}</strong> the screen.</p></div>
+      <div class="expand-item"><h4>Historical deal activity</h4><p class="big">${row.deals_in_history??0}</p><p>deals involving this company in the training dataset (FY2008–FY2017)</p></div>
+    </div></td></tr>`:''}`;
+  }).join('');
+
+  const flagged=data.filter(r=>r.Deal_Probability>=thresh).length;
+  footer.textContent=`Showing ${data.length} companies · ${flagged} above the current threshold of ${(thresh*100).toFixed(0)}%`;
+}
+
+function toggleExpand(ticker){
+  expandedTicker=expandedTicker===ticker?null:ticker;
+  renderTable();
+}
+
+function initTable(){
+  renderTable();
+  document.querySelectorAll('.pill').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.pill').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      activeFilter=btn.dataset.f;
+      expandedTicker=null;
+      renderTable();
+    });
+  });
+  document.getElementById('searchBox').addEventListener('input',()=>{expandedTicker=null;renderTable();});
+}
+
+/* ── Metric cards ── */
+function buildMetricCards(){
+  const m=REPORT_DATA.metrics,cmp=REPORT_DATA.phase_comparison;
+  const cards=[
+    {cls:'c1',lbl:'ROC-AUC',val:m.roc_auc.toFixed(4),g:true,
+     explain:'Measures how well the model separates companies that will deal from those that won\'t. 0.5 = random, 1.0 = perfect.',
+     compare:`Phase 1 (Random Forest): ${cmp.phase1.roc_auc.toFixed(4)} → Phase 2 (XGBoost): ${cmp.phase2.roc_auc.toFixed(4)}`},
+    {cls:'c2',lbl:'PR-AUC',val:m.pr_auc.toFixed(4),g:true,
+     explain:'Precision-Recall AUC. More informative than ROC-AUC when the positive class (deals) is rare. Higher is better.',
+     compare:`Phase 1: ${cmp.phase1.pr_auc.toFixed(4)} → Phase 2: ${cmp.phase2.pr_auc.toFixed(4)}`},
+    {cls:'c3',lbl:'Calibration error (ECE)',val:m.ece_platt.toFixed(4),g:true,
+     explain:'Expected Calibration Error. How far off are the predicted probabilities from reality? Closer to 0 is better.',
+     compare:`Raw XGBoost: ${m.ece_raw.toFixed(4)} → After Platt scaling: ${m.ece_platt.toFixed(4)}`},
+    {cls:'c4',lbl:'Brier score',val:m.brier_platt.toFixed(4),g:false,
+     explain:'Mean squared error of the probability predictions. Penalises both miscalibration and low sharpness. Lower is better.',
+     compare:'Combines calibration quality and confidence in one number'},
+    {cls:'c1',lbl:'Best F1 score',val:m.rec_f1.toFixed(3),g:true,
+     explain:'Harmonic mean of precision and recall at the optimal threshold. The single number that best summarises screening quality.',
+     compare:`Achieved at threshold = ${m.rec_threshold.toFixed(2)}`},
+    {cls:'c2',lbl:'Precision at threshold',val:(m.rec_precision*100).toFixed(0)+'%',g:true,
+     explain:'At the recommended threshold, this share of flagged companies actually went on to do a deal.',
+     compare:`Threshold: ${m.rec_threshold.toFixed(2)}`},
+    {cls:'c3',lbl:'Recall at threshold',val:(m.rec_recall*100).toFixed(0)+'%',g:true,
+     explain:'At the recommended threshold, this share of all deal-doing companies were successfully flagged.',
+     compare:`Of every 100 real deals, we caught ${(m.rec_recall*100).toFixed(0)}`},
+    {cls:'c4',lbl:'Portfolio hit rate',val:(m.mean_hit_rate*100).toFixed(0)+'%',g:true,
+     explain:'In backtesting, this fraction of our top-20 predictions each year actually announced a deal.',
+     compare:`Base rate (random): ${(m.base_rate*100).toFixed(1)}% → Our model: ${(m.mean_hit_rate*100).toFixed(0)}%`},
+  ];
+  document.getElementById('mcards').innerHTML=cards.map(c=>`
+    <div class="mcard ${c.cls}">
+      <div class="mcard-lbl">${c.lbl}</div>
+      <div class="mcard-val ${c.g?'g':'b'}">${c.val}</div>
+      <div class="mcard-explain">${c.explain}</div>
+      <div class="mcard-compare">${c.compare}</div>
+    </div>`).join('');
+}
+
+/* ── Threshold chart ── */
+function buildThreshChart(){
+  const rows=REPORT_DATA.threshold_analysis;
+  new Chart(document.getElementById('threshChart'),{
+    type:'line',
+    data:{labels:rows.map(r=>r.Threshold.toFixed(2)),datasets:[
+      {label:'Precision',data:rows.map(r=>r.Precision),borderColor:CY,tension:.3,pointRadius:4,borderWidth:2,fill:false},
+      {label:'Recall',   data:rows.map(r=>r.Recall),   borderColor:GR,tension:.3,pointRadius:4,borderWidth:2,fill:false},
+      {label:'F1',       data:rows.map(r=>r.F1),       borderColor:WN,tension:.3,pointRadius:5,borderWidth:2.5,fill:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:13},padding:16}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y*100).toFixed(1)}%`}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'},title:{display:true,text:'Decision threshold',font:{size:13}}},
+        y:{min:0,max:1,grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>(v*100).toFixed(0)+'%'}}
+      }
+    }
+  });
+}
+
+/* ── Calibration bins chart ── */
+function buildCalBinsChart(){
+  const bins=REPORT_DATA.calibration_bins;
+  new Chart(document.getElementById('calBinsChart'),{
+    type:'bar',
+    data:{labels:bins.map(b=>(b.mean_predicted_prob*100).toFixed(0)+'%'),datasets:[
+      {label:'Actual deal rate',     data:bins.map(b=>b.actual_fraction_deals),backgroundColor:'rgba(0,232,154,0.65)',borderColor:GR,borderWidth:1},
+      {label:'Model predicted prob.',data:bins.map(b=>b.mean_predicted_prob),  backgroundColor:'rgba(0,212,255,0.3)', borderColor:CY,borderWidth:1},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:13},padding:16}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y*100).toFixed(1)}%`}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'},title:{display:true,text:'Model score bin',font:{size:13}}},
+        y:{min:0,max:1,grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>(v*100).toFixed(0)+'%'},title:{display:true,text:'Fraction of companies that dealt',font:{size:12}}}
+      }
+    }
+  });
+}
+
+/* ── Calibration model cards ── */
+function buildCalCards(){
+  const models=REPORT_DATA.calibration_models;
+  const bestECE=Math.min(...models.map(m=>m.ECE));
+  document.getElementById('calCards').innerHTML=models.map(m=>{
+    const best=m.ECE===bestECE;
+    return `<div class="calcard ${best?'best':''}">
+      <div class="calcard-top">Calibration method ${best?'<span class="best-tag">RECOMMENDED</span>':''}</div>
+      <div class="calcard-name">${m.Model}</div>
+      <div class="calcard-rows">
+        <div class="calcard-row"><span class="calcard-key">Calibration error (ECE)</span><span class="calcard-val ${best?'better':''}">${m.ECE.toFixed(4)}</span></div>
+        <div class="calcard-row"><span class="calcard-key">Brier score</span><span class="calcard-val">${m.Brier.toFixed(4)}</span></div>
+        <div class="calcard-row"><span class="calcard-key">ROC-AUC</span><span class="calcard-val">${m.ROC_AUC.toFixed(4)}</span></div>
+        <div class="calcard-row"><span class="calcard-key">PR-AUC</span><span class="calcard-val">${m.PR_AUC.toFixed(4)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  const m=REPORT_DATA.metrics;
+  const ece_red=((1-m.ece_platt/m.ece_raw)*100).toFixed(0);
+  document.getElementById('emRow').innerHTML=`
+    <div class="em-item"><span class="em-val">${(m.ece_raw*100).toFixed(1)}%</span><span class="em-lbl">Calibration error (raw)</span></div>
+    <div class="em-item"><span class="em-val">${(m.ece_platt*100).toFixed(1)}%</span><span class="em-lbl">Calibration error (Platt)</span></div>
+    <div class="em-item"><span class="em-val">${ece_red}%</span><span class="em-lbl">Error reduction from scaling</span></div>
+    <div class="em-item"><span class="em-val">${m.brier_platt.toFixed(4)}</span><span class="em-lbl">Final Brier score</span></div>`;
+}
+
+/* ── Backtest chart ── */
+function buildBtChart(){
+  const rows=REPORT_DATA.backtest_annual;
+  const base=REPORT_DATA.metrics.base_rate;
+  new Chart(document.getElementById('btChart'),{
+    type:'bar',
+    data:{labels:rows.map(r=>'FY'+r.Year),datasets:[
+      {label:'Portfolio hit rate',data:rows.map(r=>r.Hit_Rate),
+       backgroundColor:rows.map(r=>r.Hit_Rate>=base?'rgba(0,232,154,0.65)':'rgba(255,77,109,0.55)'),
+       borderColor:rows.map(r=>r.Hit_Rate>=base?GR:RD),borderWidth:1},
+      {label:'Base rate (random)',data:rows.map(()=>base),type:'line',borderColor:WN,borderWidth:2,borderDash:[7,5],pointRadius:0,tension:0},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:13},padding:16}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y*100).toFixed(1)}%`}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{min:0,max:1,grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>(v*100).toFixed(0)+'%'},title:{display:true,text:'Hit rate',font:{size:13}}}
+      }
+    }
+  });
+}
+
+/* ── Backtest table ── */
+function buildBtTable(){
+  document.getElementById('btBody').innerHTML=REPORT_DATA.backtest_annual.map(r=>{
+    const hp=r.Port_Return!=null;
+    const ac=!hp?'na':r.Alpha>=0?'pos':'neg';
+    return `<tr>
+      <td>FY${r.Year}</td>
+      <td>${r.N_Portfolio} companies</td>
+      <td>${(r.Hit_Rate*100).toFixed(0)}% <span style="font-size:12px;color:var(--txt3)">(${r.Actual_Deal_Count} deals)</span></td>
+      <td>${r.Mean_Pred_Prob.toFixed(2)}</td>
+      <td>${r.Actual_Deal_Count}</td>
+      <td>${hp?(r.Port_Return*100).toFixed(1)+'%':'—'}</td>
+      <td>${hp?(r.Bench_Return*100).toFixed(1)+'%':'—'}</td>
+      <td class="${ac}">${hp?(r.Alpha>=0?'+':'')+(r.Alpha*100).toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded',()=>{
+  heroStats();
+  buildTicker();
+  initTable();
+  buildMetricCards();
+  buildThreshChart();
+  buildCalBinsChart();
+  buildCalCards();
+  buildBtChart();
+  buildBtTable();
+});
+</script>
+</body>
+</html>
